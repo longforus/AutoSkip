@@ -17,11 +17,13 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.rikka.tools.refine.Refine
 import rikka.shizuku.SystemServiceHelper
+import top.xjunz.automator.AutomatorConnection.Companion.SKIP_KEYWORD
 import top.xjunz.automator.model.Result
 import top.xjunz.automator.util.Records
 import top.xjunz.automator.util.formatCurrentTime
 import java.io.*
 import java.util.*
+import java.util.regex.Pattern
 import kotlin.system.exitProcess
 
 
@@ -39,7 +41,7 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         private const val APPLICATION_ID = "top.xjunz.automator"
         const val TAG = "automator"
         const val MAX_RECORD_COUNT: Short = 500
-        val SKIP_KEYWORD:Array<String> = arrayOf("跳过", "skip")
+        val SKIP_KEYWORD: Array<String> = arrayOf("\\s*\\d*\\s?跳过\\s?\\d*\\s*", "skip")
     }
 
     private lateinit var uiAutomationHidden: UiAutomationHidden
@@ -238,13 +240,19 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         handler.post {
             val standaloneResult = Result()
             try {
-                val possibleAccessibilityNodeInfo:MutableList<AccessibilityNodeInfo> = mutableListOf()
+                val possibleAccessibilityNodeInfo: MutableList<AccessibilityNodeInfo> = mutableListOf()
                 SKIP_KEYWORD.forEach {
-                    possibleAccessibilityNodeInfo.addAll(uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText(it))
+                    if (it.contains("\\")) {
+                        possibleAccessibilityNodeInfo.addAll(findAccessibilityNodeInfosByRegex(uiAutomation.rootInActiveWindow, Pattern.compile(it)))
+                    } else {
+                        uiAutomation.rootInActiveWindow?.let { an ->
+                            possibleAccessibilityNodeInfo.addAll(an.findAccessibilityNodeInfosByText(it))
+                        }
+                    }
                 }
-                for(it in possibleAccessibilityNodeInfo) {
+                for (it in possibleAccessibilityNodeInfo) {
                     // skip the EditText
-                    if(it.isEditable) continue
+                    if (it.isEditable) continue
                     checkSource(it, standaloneResult.apply { reset() }, false)
                 }
             } catch (t: Throwable) {
@@ -258,6 +266,23 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
             }
         }
     }
+
+
+    private fun findAccessibilityNodeInfosByRegex(rootNode: AccessibilityNodeInfo?, pattern: Pattern?): List<AccessibilityNodeInfo> {
+        val result: MutableList<AccessibilityNodeInfo> = ArrayList()
+        if (rootNode == null || pattern == null) {
+            return result
+        }
+        if (rootNode.text != null && !rootNode.isEditable && rootNode.isEnabled && pattern.matcher(rootNode.text).matches()) {
+            result.add(rootNode)
+        }
+        for (i in 0 until rootNode.childCount) {
+            val child = rootNode.getChild(i)
+            result.addAll(findAccessibilityNodeInfosByRegex(child, pattern))
+        }
+        return result
+    }
+
 
     override fun getRecords() = records.asList()
 
@@ -289,9 +314,15 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
      */
     private fun checkSource(source: AccessibilityNodeInfo, result: Result, inject: Boolean) {
         result.pkgName = source.packageName.toString()
-        val possibleAccessibilityNodeInfo:MutableList<AccessibilityNodeInfo> = mutableListOf()
+        val possibleAccessibilityNodeInfo: MutableList<AccessibilityNodeInfo> = mutableListOf()
         SKIP_KEYWORD.forEach {
-            possibleAccessibilityNodeInfo.addAll(source.findAccessibilityNodeInfosByText(it))
+            if (it.contains("\\")) {
+                possibleAccessibilityNodeInfo.addAll(findAccessibilityNodeInfosByRegex(uiAutomation.rootInActiveWindow, Pattern.compile(it)))
+            } else {
+                uiAutomation.rootInActiveWindow?.let { an ->
+                    possibleAccessibilityNodeInfo.addAll(an.findAccessibilityNodeInfosByText(it))
+                }
+            }
         }
         possibleAccessibilityNodeInfo.run {
             when (size) {
@@ -308,7 +339,7 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
             result.maskReason(Result.REASON_INVISIBLE)
             return
         }
-        if (node.isEditable){
+        if (node.isEditable) {
             result.maskReason(Result.REASON_EDITABLE)
             return
         }
