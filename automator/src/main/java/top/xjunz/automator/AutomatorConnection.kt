@@ -41,7 +41,7 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         private const val APPLICATION_ID = "top.xjunz.automator"
         const val TAG = "automator"
         const val MAX_RECORD_COUNT: Short = 500
-        val SKIP_KEYWORD: Array<String> = arrayOf("\\s*\\d*\\s?跳过\\s?\\d*\\s*", "skip")
+        val SKIP_KEYWORD: Array<String> = arrayOf("\\s*\\d*\\s?跳过\\s?\\d*\\s*", "skip", "\\s*\\d*\\s?跳过广告\\s?\\d*\\s*")
     }
 
     private lateinit var uiAutomationHidden: UiAutomationHidden
