@@ -17,7 +17,6 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.rikka.tools.refine.Refine
 import rikka.shizuku.SystemServiceHelper
-import top.xjunz.automator.AutomatorConnection.Companion.SKIP_KEYWORD
 import top.xjunz.automator.model.Result
 import top.xjunz.automator.util.Records
 import top.xjunz.automator.util.formatCurrentTime
@@ -42,6 +41,11 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         const val TAG = "automator"
         const val MAX_RECORD_COUNT: Short = 500
         val SKIP_KEYWORD: Array<String> = arrayOf("\\s*\\d*\\s?跳过\\s?\\d*\\s*", "skip", "\\s*\\d*\\s?跳过广告\\s?\\d*\\s*")
+        val SKIP_IDS = arrayOf(
+            "com.baidu.netdisk:id/iv_close",
+            "com.baidu.netdisk:id/banner_item_close",
+            "com.baidu.netdisk:id/close_notification_tip"
+        )
     }
 
     private lateinit var uiAutomationHidden: UiAutomationHidden
@@ -128,7 +132,7 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         var oldPkgName: String? = null
         uiAutomation.serviceInfo = uiAutomation.serviceInfo.apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOWS_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-            flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         }
         checkResult = Result()
         uiAutomation.setOnAccessibilityEventListener listener@{ event ->
@@ -250,6 +254,9 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
                         }
                     }
                 }
+                SKIP_IDS.forEach {
+                    possibleAccessibilityNodeInfo.addAll(findAccessibilityNodeInfosByID(uiAutomation.rootInActiveWindow,it))
+                }
                 for (it in possibleAccessibilityNodeInfo) {
                     // skip the EditText
                     if (it.isEditable) continue
@@ -279,6 +286,20 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         for (i in 0 until rootNode.childCount) {
             val child = rootNode.getChild(i)
             result.addAll(findAccessibilityNodeInfosByRegex(child, pattern))
+        }
+        return result
+    }
+    private fun findAccessibilityNodeInfosByID(rootNode: AccessibilityNodeInfo?, id: String): List<AccessibilityNodeInfo> {
+        val result: MutableList<AccessibilityNodeInfo> = ArrayList()
+        if (rootNode == null || id.isEmpty()) {
+            return result
+        }
+        if (rootNode.isEnabled && rootNode.viewIdResourceName==id) {
+            result.add(rootNode)
+        }
+        for (i in 0 until rootNode.childCount) {
+            val child = rootNode.getChild(i)
+            result.addAll(findAccessibilityNodeInfosByID(child, id))
         }
         return result
     }
@@ -322,6 +343,14 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
                 uiAutomation.rootInActiveWindow?.let { an ->
                     possibleAccessibilityNodeInfo.addAll(an.findAccessibilityNodeInfosByText(it))
                 }
+            }
+        }
+        SKIP_IDS.forEach {
+            for (info in findAccessibilityNodeInfosByID(uiAutomation.rootInActiveWindow, it)) {
+                    if (info.isClickable&&inject){
+                        info.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        Log.d(TAG,"click ids ${info.viewIdResourceName}")
+                    }
             }
         }
         possibleAccessibilityNodeInfo.run {
