@@ -44,6 +44,7 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         val SKIP_IDS = arrayOf(
             "com.baidu.netdisk:id/iv_close",
             "com.baidu.netdisk:id/banner_item_close",
+            "com.baidu.netdisk:id/ms_skipView",
             "com.baidu.netdisk:id/close_notification_tip"
         )
     }
