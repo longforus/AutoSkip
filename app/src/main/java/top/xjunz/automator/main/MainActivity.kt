@@ -9,10 +9,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.FileProvider
+import androidx.core.content.edit
 import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.Observer
@@ -43,6 +47,11 @@ class MainActivity : AppCompatActivity() {
         AutomatorViewModel.get()
     }
 
+    private val sp by lazy {
+        getSharedPreferences("skipIds", MODE_PRIVATE)
+
+    }
+
     companion object {
         const val SHIZUKU_PERMISSION_REQUEST_CODE = 13
     }
@@ -54,6 +63,10 @@ class MainActivity : AppCompatActivity() {
                 lifecycleOwner = this@MainActivity
                 vm = viewModel
             }
+        val stringSet = sp.getStringSet("skipIds", emptySet())
+        if (!stringSet.isNullOrEmpty()) {
+            AutomatorConnection.SKIP_IDS.addAll(stringSet)
+        }
         initViews()
     }
 
@@ -110,6 +123,7 @@ class MainActivity : AppCompatActivity() {
                             startActivity(Intent.createChooser(intent, null))
                         }
                     }
+
                     R.id.item_auto_start -> if (it.isChecked) {
                         setAutoStartComponentEnable(false)
                     } else {
@@ -125,6 +139,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         it.isChecked = isAutoStartEnabled()
                     }
+
                     R.id.item_feedback_email -> {
                         viewModel.dumpLog()
                         if (getFileStreamPath(LOG_FILE_NAME).exists()) {
@@ -134,6 +149,7 @@ class MainActivity : AppCompatActivity() {
                             sendMailTo(this@MainActivity, null)
                         }
                     }
+
                     R.id.item_feedback_group -> viewUrl(this@MainActivity, FEEDBACK_GROUP_URL)
                     R.id.item_feedback_issues -> viewUrl(this@MainActivity, "https://github.com/xjunz/AutoSkip/issues")
                     R.id.item_about -> AboutFragment().show(supportFragmentManager, "about")
@@ -181,6 +197,50 @@ class MainActivity : AppCompatActivity() {
             }
             if (!initialized) init()
         }
+
+        binding.tvCaptionMore.text = AutomatorConnection.SKIP_IDS.joinToString("\n")
+        binding.tvCaptionMore.setOnClickListener {
+            showMultiLineInputDialog()
+        }
+    }
+
+    private fun showMultiLineInputDialog() {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("输入文本")
+
+        // 创建一个EditText并设置为多行文本
+        val input = EditText(this)
+        input.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        input.isSingleLine = false
+        input.maxLines = 5 // 设置最大行数
+        val stringSet = sp.getStringSet("skipIds", emptySet())
+        if (!stringSet.isNullOrEmpty()) {
+            input.setText(stringSet.joinToString("\n"))
+        }
+        builder.setView(input)
+
+        builder.setPositiveButton("确定") { dialog, _ ->
+            // 获取输入的文本
+            val text = input.text.toString()
+            text.split("\n").toSet().let {
+                if (it.isNotEmpty()) {
+                    sp.edit (commit = true){
+                        putStringSet("skipIds", it)
+                    }
+                }
+            }
+            // 在这里处理文本
+            dialog.dismiss()
+        }
+
+        builder.setNegativeButton("取消") { dialog, _ ->
+            dialog.cancel()
+        }
+
+        builder.show()
     }
 
     override fun onResume() {

@@ -41,11 +41,14 @@ class AutomatorConnection : IAutomatorConnection.Stub() {
         const val TAG = "automator"
         const val MAX_RECORD_COUNT: Short = 500
         val SKIP_KEYWORD: Array<String> = arrayOf("\\s*\\d*\\s?跳过\\s?\\d*\\s*", "skip", "\\s*\\d*\\s?跳过广告\\s?\\d*\\s*")
-        val SKIP_IDS = arrayOf(
+        val SKIP_IDS = mutableListOf(
             "com.baidu.netdisk:id/iv_close",
             "com.baidu.netdisk:id/banner_item_close",
             "com.baidu.netdisk:id/ms_skipView",
-            "com.baidu.netdisk:id/close_notification_tip"
+            "com.baidu.netdisk:id/close_notification_tip",
+            "com.byted.pangle:id/tt_splash_skip_btn",
+            "com.baidu.netdisk:id/countdown",
+            "com.baidu.netdisk:id/float_btn_close",
         )
     }
 

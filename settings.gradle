@@ -1,4 +1,4 @@
-rootProject.name = "自动点击"
+rootProject.name = "AutoClick"
 include ':app'
 include ':automator'
 include ':automator:hidden-apis'
